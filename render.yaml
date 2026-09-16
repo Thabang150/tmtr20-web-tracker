@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: tmtr20-api
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: TRACKING_SCRIPT_URL
+        sync: false
+      - key: TRACKING_API_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: REPORT_STORAGE_PATH
+        value: storage/reports
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_SECURE
+        value: 'false'
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: REPORT_EMAIL_FROM
+        sync: false
+      - key: REPORT_SCHEDULER_ENABLED
+        value: 'false'
+      - key: REPORT_SCHEDULER_CRON
+        value: '0 2 1 * *'

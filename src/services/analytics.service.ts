@@ -1,0 +1,185 @@
+import { Types } from 'mongoose';
+import { EventModel } from '../models/event.model.js';
+import { SessionModel } from '../models/session.model.js';
+import { WebsiteModel } from '../models/website.model.js';
+import { AppError } from '../middleware/error-handler.js';
+
+const CONVERSION_EVENTS = [
+  'whatsapp_click',
+  'phone_click',
+  'email_click',
+  'form_submission',
+  'cta_click',
+] as const;
+
+interface DateRange {
+  start: Date;
+  end: Date;
+}
+
+interface EventSummary {
+  visitors: number;
+  sessions: number;
+  pageViews: number;
+}
+
+export async function assertWebsiteAccess(ownerId: string, websiteId: string): Promise<Types.ObjectId> {
+  if (!Types.ObjectId.isValid(websiteId)) {
+    throw new AppError(404, 'WEBSITE_NOT_FOUND', 'Website not found');
+  }
+
+  const website = await WebsiteModel.exists({ _id: websiteId, ownerId });
+  if (!website) {
+    throw new AppError(404, 'WEBSITE_NOT_FOUND', 'Website not found');
+  }
+
+  return new Types.ObjectId(websiteId);
+}
+
+export async function getOverview(websiteId: Types.ObjectId, range: DateRange) {
+  const [summary, conversions, sessionSummary] = await Promise.all([
+    getEventSummary(websiteId, range),
+    getConversionSummary(websiteId, range),
+    getSessionSummary(websiteId, range),
+  ]);
+
+  return {
+    period: { startDate: range.start.toISOString(), endDate: range.end.toISOString() },
+    visitors: summary.visitors,
+    sessions: summary.sessions,
+    pageViews: summary.pageViews,
+    pagesPerSession: summary.sessions ? round(summary.pageViews / summary.sessions) : 0,
+    averageSessionDurationSeconds: sessionSummary.averageDurationSeconds,
+    conversions: conversions.total,
+    conversionRate: summary.sessions ? round((conversions.total / summary.sessions) * 100) : 0,
+    conversionBreakdown: conversions.breakdown,
+  };
+}
+
+export async function getTraffic(websiteId: Types.ObjectId, range: DateRange) {
+  const [summary, trend] = await Promise.all([
+    getEventSummary(websiteId, range),
+    EventModel.aggregate([
+      { $match: eventMatch(websiteId, range) },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
+          visitors: { $addToSet: '$visitorId' },
+          sessions: { $addToSet: '$sessionId' },
+          pageViews: { $sum: { $cond: [{ $eq: ['$eventName', 'page_view'] }, 1, 0] } },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          date: '$_id',
+          visitors: { $size: '$visitors' },
+          sessions: { $size: '$sessions' },
+          pageViews: 1,
+        },
+      },
+      { $sort: { date: 1 } },
+    ]),
+  ]);
+
+  return { period: periodResponse(range), summary, trend };
+}
+
+export async function getConversions(websiteId: Types.ObjectId, range: DateRange) {
+  const conversions = await getConversionSummary(websiteId, range);
+  const summary = await getEventSummary(websiteId, range);
+
+  return {
+    period: periodResponse(range),
+    ...conversions,
+    conversionRate: summary.sessions ? round((conversions.total / summary.sessions) * 100) : 0,
+  };
+}
+
+export async function getSources(websiteId: Types.ObjectId, range: DateRange) {
+  const sources = await SessionModel.aggregate([
+    { $match: { websiteId, startTime: { $gte: range.start, $lt: range.end } } },
+    {
+      $group: {
+        _id: { source: { $ifNull: ['$source', '(direct)'] }, medium: { $ifNull: ['$medium', '(none)'] }, campaign: { $ifNull: ['$campaign', '(none)'] } },
+        sessions: { $sum: 1 },
+        visitors: { $addToSet: '$visitorId' },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        source: '$_id.source',
+        medium: '$_id.medium',
+        campaign: '$_id.campaign',
+        sessions: 1,
+        visitors: { $size: '$visitors' },
+      },
+    },
+    { $sort: { sessions: -1 } },
+  ]);
+
+  return { period: periodResponse(range), sources };
+}
+
+export async function getTopPages(websiteId: Types.ObjectId, range: DateRange) {
+  const pages = await EventModel.aggregate([
+    { $match: { ...eventMatch(websiteId, range), eventName: 'page_view' } },
+    { $group: { _id: { $ifNull: ['$pagePath', '(unknown)'] }, pageViews: { $sum: 1 }, visitors: { $addToSet: '$visitorId' } } },
+    { $project: { _id: 0, pagePath: '$_id', pageViews: 1, visitors: { $size: '$visitors' } } },
+    { $sort: { pageViews: -1 } },
+    { $limit: 100 },
+  ]);
+
+  return { period: periodResponse(range), pages };
+}
+
+async function getEventSummary(websiteId: Types.ObjectId, range: DateRange): Promise<EventSummary> {
+  const [result] = await EventModel.aggregate([
+    { $match: eventMatch(websiteId, range) },
+    {
+      $group: {
+        _id: null,
+        visitors: { $addToSet: '$visitorId' },
+        sessions: { $addToSet: '$sessionId' },
+        pageViews: { $sum: { $cond: [{ $eq: ['$eventName', 'page_view'] }, 1, 0] } },
+      },
+    },
+    { $project: { _id: 0, visitors: { $size: '$visitors' }, sessions: { $size: '$sessions' }, pageViews: 1 } },
+  ]);
+
+  return result ?? { visitors: 0, sessions: 0, pageViews: 0 };
+}
+
+async function getConversionSummary(websiteId: Types.ObjectId, range: DateRange) {
+  const rows = await EventModel.aggregate([
+    { $match: { ...eventMatch(websiteId, range), eventName: { $in: CONVERSION_EVENTS } } },
+    { $group: { _id: '$eventName', count: { $sum: 1 } } },
+  ]);
+  const breakdown = Object.fromEntries(CONVERSION_EVENTS.map((eventName) => [eventName, 0]));
+  for (const row of rows) breakdown[row._id] = row.count;
+
+  return { total: Object.values(breakdown).reduce((total, count) => total + count, 0), breakdown };
+}
+
+async function getSessionSummary(websiteId: Types.ObjectId, range: DateRange) {
+  const [result] = await SessionModel.aggregate([
+    { $match: { websiteId, startTime: { $gte: range.start, $lt: range.end }, endTime: { $exists: true } } },
+    { $project: { durationSeconds: { $divide: [{ $subtract: ['$endTime', '$startTime'] }, 1000] } } },
+    { $group: { _id: null, averageDurationSeconds: { $avg: '$durationSeconds' } } },
+  ]);
+
+  return { averageDurationSeconds: result ? round(result.averageDurationSeconds) : 0 };
+}
+
+function eventMatch(websiteId: Types.ObjectId, range: DateRange) {
+  return { websiteId, timestamp: { $gte: range.start, $lt: range.end } };
+}
+
+function periodResponse(range: DateRange) {
+  return { startDate: range.start.toISOString(), endDate: range.end.toISOString() };
+}
+
+function round(value: number): number {
+  return Math.round(value * 100) / 100;
+}
