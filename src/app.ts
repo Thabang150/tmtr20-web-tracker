@@ -34,7 +34,7 @@ const trackingCors = cors({
   origin: (_origin, callback) => callback(null, true),
   methods: ['POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false,
+  credentials: true,
 });
 
 app.use(express.json({ limit: '100kb' }));
