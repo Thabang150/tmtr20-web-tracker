@@ -19,6 +19,10 @@ export const sources: RequestHandler = async (request, response, next) => {
   await handle(request, response, next, 'sources', analyticsService.getSources);
 };
 
+export const audience: RequestHandler = async (request, response, next) => {
+  await handle(request, response, next, 'audience', analyticsService.getAudience);
+};
+
 export const topPages: RequestHandler = async (request, response, next) => {
   await handle(request, response, next, 'top-pages', analyticsService.getTopPages);
 };

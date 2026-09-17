@@ -8,4 +8,5 @@ analyticsRouter.get('/:id/overview', analyticsController.overview);
 analyticsRouter.get('/:id/traffic', analyticsController.traffic);
 analyticsRouter.get('/:id/conversions', analyticsController.conversions);
 analyticsRouter.get('/:id/sources', analyticsController.sources);
+analyticsRouter.get('/:id/audience', analyticsController.audience);
 analyticsRouter.get('/:id/top-pages', analyticsController.topPages);

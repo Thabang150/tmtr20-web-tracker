@@ -28,6 +28,11 @@ export interface Event {
   utmTerm?: string;
   referralDomain?: string;
   sourceCategory?: string;
+  os?: string;
+  language?: string;
+  timezone?: string;
+  viewportCategory?: string;
+  screenCategory?: string;
   device?: string;
   browser?: string;
   country?: string;
@@ -55,6 +60,11 @@ const eventSchema = new Schema<Event, Model<Event>>(
     utmTerm: { type: String, trim: true, maxlength: 200 },
     referralDomain: { type: String, trim: true, maxlength: 255 },
     sourceCategory: { type: String, trim: true, maxlength: 50 },
+    os: { type: String, trim: true, maxlength: 30 },
+    language: { type: String, trim: true, maxlength: 20 },
+    timezone: { type: String, trim: true, maxlength: 100 },
+    viewportCategory: { type: String, trim: true, maxlength: 20 },
+    screenCategory: { type: String, trim: true, maxlength: 20 },
     device: { type: String, trim: true, maxlength: 100 },
     browser: { type: String, trim: true, maxlength: 100 },
     country: { type: String, trim: true, maxlength: 100 },

@@ -5,6 +5,7 @@ import { WebsiteModel } from '../models/website.model.js';
 import type { TrackEventInput } from '../validators/tracking.validators.js';
 import { randomUUID } from 'node:crypto';
 import { getAcquisitionData, hasAttribution } from '../utils/acquisition.utils.js';
+import { normalizeAudience } from '../utils/audience.utils.js';
 
 export async function trackEvent(input: TrackEventInput): Promise<void> {
   const website = await WebsiteModel.findOne({ trackingId: input.trackingId, status: 'ACTIVE' }).select('_id');
@@ -17,6 +18,7 @@ export async function trackEvent(input: TrackEventInput): Promise<void> {
   validateTimestamp(timestamp, receivedAt);
   const eventId = input.eventId ?? randomUUID();
   const acquisition = getAcquisitionData(input);
+  const audience = normalizeAudience(input);
   const { eventId: _eventId, trackingId: _trackingId, timestamp: _timestamp, ...eventFields } = input;
 
   try {
@@ -29,6 +31,7 @@ export async function trackEvent(input: TrackEventInput): Promise<void> {
       receivedAt,
       referralDomain: acquisition.referralDomain,
       sourceCategory: acquisition.sourceCategory,
+      ...audience,
     });
   } catch (error) {
     if (isDuplicateKeyError(error)) {
@@ -66,6 +69,7 @@ export async function trackEvent(input: TrackEventInput): Promise<void> {
       firstTouch,
       lastTouch: firstTouch,
       device: input.device,
+      ...audience,
       startTime: timestamp,
       endTime: timestamp,
       lastActivityAt: receivedAt,

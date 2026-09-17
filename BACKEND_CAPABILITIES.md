@@ -31,7 +31,7 @@ The script runs in the visitor's browser and sends events to `POST /api/track`. 
 - `form_submission`
 - `cta_click`
 
-It also captures anonymous visitor/session IDs, page URL and path, referrer, UTM parameters including `utm_term`, device type, browser, and timestamps. The backend derives a normalized referral domain and classifies traffic as Direct, Organic Search, Paid Search, Social, Paid Social, Video, Referral, Email, or Other. Session records retain first-touch and last-touch acquisition data. It does not collect form values or passwords.
+It also captures anonymous visitor/session IDs, page URL and path, referrer, UTM parameters including `utm_term`, device type, browser, coarse operating system, language, timezone, viewport category, screen category, and timestamps. The backend derives a normalized referral domain and classifies traffic as Direct, Organic Search, Paid Search, Social, Paid Social, Video, Referral, Email, or Other. Session records retain first-touch and last-touch acquisition data plus an audience snapshot. It does not collect form values, passwords, raw user agents, exact screen sizes, or invasive device fingerprints.
 
 Each new event now has an event ID and schema version. The backend records both the client event timestamp and a server receipt timestamp, rejects timestamps that are more than five minutes in the future or 30 days old, and treats repeated event IDs for the same website as an idempotent duplicate. Sessions also track their latest activity time.
 
@@ -70,8 +70,9 @@ Authenticated website owners can query:
 - Conversion metrics
 - Sources and campaigns
 - Top pages
+- Audience breakdowns by device, operating system, language, timezone, viewport category, and screen category
 
-Analytics are calculated from stored events and sessions for a requested date range.
+Analytics are calculated from stored events and sessions for a requested date range. Audience breakdowns are session-based to avoid repeatedly aggregating stable technology values from every event.
 
 ## Website audits
 
@@ -110,6 +111,8 @@ Reports reuse analytics and the latest website audit.
 - Authentication: `/api/auth/*`
 - Website management: `/api/websites/*`
 - Analytics, audits, and reports: `/api/websites/:id/*`
+
+The audience analytics endpoint is `GET /api/websites/:id/audience` and requires dashboard authentication and website ownership.
 
 The authenticated dashboard routes remain protected while only the tracker asset and public tracking endpoint are configured for cross-origin use.
 

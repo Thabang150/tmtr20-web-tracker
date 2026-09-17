@@ -17,6 +17,11 @@ export interface Session {
   firstTouch?: SessionAttribution;
   lastTouch?: SessionAttribution;
   device?: string;
+  os?: string;
+  language?: string;
+  timezone?: string;
+  viewportCategory?: string;
+  screenCategory?: string;
   startTime: Date;
   endTime?: Date;
   lastActivityAt?: Date;
@@ -51,6 +56,11 @@ const sessionSchema = new Schema<Session, Model<Session>>({
   firstTouch: { type: Schema.Types.Mixed },
   lastTouch: { type: Schema.Types.Mixed },
   device: { type: String, trim: true, maxlength: 100 },
+  os: { type: String, trim: true, maxlength: 30 },
+  language: { type: String, trim: true, maxlength: 20 },
+  timezone: { type: String, trim: true, maxlength: 100 },
+  viewportCategory: { type: String, trim: true, maxlength: 20 },
+  screenCategory: { type: String, trim: true, maxlength: 20 },
   startTime: { type: Date, required: true },
   endTime: { type: Date },
   lastActivityAt: { type: Date },

@@ -20,6 +20,11 @@ export const trackEventSchema = z.object({
   device: optionalText(100),
   browser: optionalText(100),
   country: optionalText(100),
+  os: optionalText(30),
+  language: optionalText(20),
+  timezone: optionalText(100),
+  viewportCategory: z.enum(['small', 'medium', 'large']).optional(),
+  screenCategory: z.enum(['small', 'medium', 'large']).optional(),
   timestamp: z.coerce.date().optional(),
   metadata: z.record(z.string(), z.unknown()).optional()
     .refine((value) => !value || Object.keys(value).length <= 20, 'Metadata cannot contain more than 20 keys')

@@ -195,3 +195,34 @@ function periodResponse(range: DateRange) {
 function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+export async function getAudience(websiteId: Types.ObjectId, range: DateRange) {
+  const match = { websiteId, startTime: { $gte: range.start, $lt: range.end } };
+  const [devices, operatingSystems, languages, timezones, viewports, screens] = await Promise.all([
+    getAudienceBreakdown(match, '$device', '(unknown)'),
+    getAudienceBreakdown(match, '$os', '(unknown)'),
+    getAudienceBreakdown(match, '$language', '(unknown)'),
+    getAudienceBreakdown(match, '$timezone', '(unknown)'),
+    getAudienceBreakdown(match, '$viewportCategory', '(unknown)'),
+    getAudienceBreakdown(match, '$screenCategory', '(unknown)'),
+  ]);
+
+  return {
+    period: periodResponse(range),
+    devices,
+    operatingSystems,
+    languages,
+    timezones,
+    viewports,
+    screens,
+  };
+}
+
+async function getAudienceBreakdown(match: Record<string, unknown>, field: string, fallback: string) {
+  return SessionModel.aggregate([
+    { $match: match },
+    { $group: { _id: { $ifNull: [field, fallback] }, sessions: { $sum: 1 }, visitors: { $addToSet: '$visitorId' } } },
+    { $project: { _id: 0, value: '$_id', sessions: 1, visitors: { $size: '$visitors' } } },
+    { $sort: { sessions: -1, value: 1 } },
+  ]);
+}

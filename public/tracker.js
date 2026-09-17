@@ -146,6 +146,42 @@
     return 'Unknown';
   }
 
+  function getOperatingSystem() {
+    const userAgent = navigator.userAgent || '';
+    if (/Windows/i.test(userAgent)) return 'Windows';
+    if (/iPhone|iPad|iPod/i.test(userAgent)) return 'iOS';
+    if (/Android/i.test(userAgent)) return 'Android';
+    if (/Mac OS X|Macintosh/i.test(userAgent)) return 'macOS';
+    if (/Linux/i.test(userAgent)) return 'Linux';
+    return 'Other';
+  }
+
+  function getLanguage() {
+    return (navigator.language || '').trim() || undefined;
+  }
+
+  function getTimezone() {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+    } catch (_error) {
+      return undefined;
+    }
+  }
+
+  function getSizeCategory(width) {
+    if (width < 480) return 'small';
+    if (width < 1024) return 'medium';
+    return 'large';
+  }
+
+  function getViewportCategory() {
+    return getSizeCategory(window.innerWidth || 0);
+  }
+
+  function getScreenCategory() {
+    return getSizeCategory(window.screen?.width || 0);
+  }
+
   function getReferrer() {
     return document.referrer || '';
   }
@@ -174,6 +210,11 @@
       referrer: getReferrer(),
       device: getDeviceType(),
       browser: getBrowserName(),
+      os: getOperatingSystem(),
+      language: getLanguage(),
+      timezone: getTimezone(),
+      viewportCategory: getViewportCategory(),
+      screenCategory: getScreenCategory(),
       timestamp: new Date().toISOString(),
       ...getUtmData(),
       ...extra,
