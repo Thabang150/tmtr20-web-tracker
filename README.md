@@ -95,7 +95,7 @@ http POST :3000/api/websites `
 
 Supported events:
 
-`page_view`, `session_start`, `whatsapp_click`, `phone_click`, `email_click`, `form_submission`, `cta_click`
+`page_view`, `session_start`, `whatsapp_click`, `phone_click`, `email_click`, `form_submission`, `cta_click`, `scroll_depth`, `engagement_time`, `outbound_click`, `form_start`, `form_abandonment`, `rage_click`, `dead_click`, `click`
 
 Example:
 
@@ -115,6 +115,8 @@ http POST :3000/api/track `
 ```
 
 Accepted events return `202` with `{ "accepted": true }`. Events are tied to the website resolved from the tracking ID. Sessions are upserted by `(websiteId, sessionId)` and page-view events increment their page-view count.
+
+The `click` event stores only normalized, bucketable coordinates for heatmap aggregation. It excludes form controls and editable content, and the backend does not store screenshots, cursor paths, or session video. Behavior and heatmap aggregates are available through the authenticated `GET /api/websites/:id/behavior` endpoint.
 
 ## Real website tracking script
 

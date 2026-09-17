@@ -399,9 +399,33 @@
     return (element.getAttribute('data-tmtr20-id') || element.id || element.tagName.toLowerCase()).slice(0, 100);
   }
 
+  function toBasisPoints(value, maximum) {
+    if (!maximum || !Number.isFinite(value)) return 0;
+    return Math.min(10000, Math.max(0, Math.round((value / maximum) * 10000)));
+  }
+
+  function getHeatmapMetadata(event, target) {
+    const documentHeight = Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight || 0);
+    const viewportWidth = window.innerWidth || 0;
+    const viewportHeight = window.innerHeight || 0;
+    return {
+      x: toBasisPoints((event.clientX || 0) + (window.scrollX || 0), Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth || viewportWidth)),
+      y: toBasisPoints((event.clientY || 0) + (window.scrollY || 0), documentHeight),
+      viewportX: toBasisPoints(event.clientX || 0, viewportWidth),
+      viewportY: toBasisPoints(event.clientY || 0, viewportHeight),
+      scrollPercent: getScrollPercent(),
+      targetTag: target.tagName.toLowerCase(),
+      ...(target.getAttribute('data-tmtr20-id') ? { targetId: target.getAttribute('data-tmtr20-id').slice(0, 100) } : {}),
+    };
+  }
+
   function handleBehaviorClick(event) {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
+
+    if (!target.closest('input, textarea, select, option, [contenteditable="true"], [data-tmtr20-no-track]')) {
+      track('click', { metadata: getHeatmapMetadata(event, target) });
+    }
 
     const now = Date.now();
     const clickState = rageClicks.get(target) || { times: [], cooldownUntil: 0 };

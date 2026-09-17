@@ -228,7 +228,7 @@ async function getAudienceBreakdown(match: Record<string, unknown>, field: strin
 }
 
 export async function getBehavior(websiteId: Types.ObjectId, range: DateRange) {
-  const [scrollDepth, engagement, outboundClicks, forms, interactionProblems] = await Promise.all([
+  const [scrollDepth, engagement, outboundClicks, forms, interactionProblems, clicks] = await Promise.all([
     EventModel.aggregate([
       { $match: { ...eventMatch(websiteId, range), eventName: 'scroll_depth' } },
       { $group: { _id: { pagePath: { $ifNull: ['$pagePath', '(unknown)'] }, depthPercent: '$metadata.depthPercent' }, reached: { $sum: 1 } } },
@@ -259,6 +259,22 @@ export async function getBehavior(websiteId: Types.ObjectId, range: DateRange) {
       { $project: { _id: 0, eventName: '$_id.eventName', pagePath: '$_id.pagePath', count: 1 } },
       { $sort: { count: -1 } },
     ]),
+    EventModel.aggregate([
+      { $match: { ...eventMatch(websiteId, range), eventName: 'click' } },
+      {
+        $group: {
+          _id: {
+            pagePath: { $ifNull: ['$pagePath', '(unknown)'] },
+            x: { $multiply: [{ $floor: { $divide: ['$metadata.x', 100] } }, 100] },
+            y: { $multiply: [{ $floor: { $divide: ['$metadata.y', 100] } }, 100] },
+          },
+          clicks: { $sum: 1 },
+        },
+      },
+      { $project: { _id: 0, pagePath: '$_id.pagePath', x: '$_id.x', y: '$_id.y', clicks: 1 } },
+      { $sort: { clicks: -1 } },
+      { $limit: 5000 },
+    ]),
   ]);
 
   return {
@@ -268,5 +284,6 @@ export async function getBehavior(websiteId: Types.ObjectId, range: DateRange) {
     outboundClicks,
     forms,
     interactionProblems,
+    clicks,
   };
 }

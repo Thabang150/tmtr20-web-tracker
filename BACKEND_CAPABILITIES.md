@@ -117,6 +117,8 @@ The audience analytics endpoint is `GET /api/websites/:id/audience` and requires
 
 The behavior analytics endpoint is `GET /api/websites/:id/behavior` and requires dashboard authentication and website ownership. The tracker emits bounded scroll thresholds, visibility-aware engagement intervals, navigation metadata, outbound link events, form starts and abandonments, and conservative rage/dead-click signals. It does not collect form values, keystrokes, exact cursor paths, or full DOM text.
 
+Behavior analytics also includes a heatmap data foundation. The tracker emits one normalized `click` point per ordinary click, excluding form controls, editable content, and elements marked with `data-tmtr20-no-track`. Coordinates are stored as integer basis points and aggregated into 1% page-position cells. The system stores no screenshots, cursor paths, or session video.
+
 The authenticated dashboard routes remain protected while only the tracker asset and public tracking endpoint are configured for cross-origin use.
 
 ## Current boundaries

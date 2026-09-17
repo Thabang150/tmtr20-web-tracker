@@ -15,6 +15,7 @@ export const EVENT_NAMES = [
   'form_abandonment',
   'rage_click',
   'dead_click',
+  'click',
 ] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
 
@@ -83,6 +84,7 @@ const eventSchema = new Schema<Event, Model<Event>>(
 );
 
 eventSchema.index({ websiteId: 1, timestamp: 1 });
+eventSchema.index({ websiteId: 1, eventName: 1, timestamp: 1 });
 eventSchema.index({ websiteId: 1, eventId: 1 }, { unique: true, sparse: true });
 eventSchema.index({ websiteId: 1, visitorId: 1 });
 eventSchema.index({ websiteId: 1, sessionId: 1 });

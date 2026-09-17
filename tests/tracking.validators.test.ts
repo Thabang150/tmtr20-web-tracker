@@ -34,6 +34,48 @@ test('accepts behavior event names with bounded metadata', () => {
   }
 });
 
+test('accepts normalized heatmap click metadata', () => {
+  const result = trackEventSchema.safeParse({
+    eventId: 'event_click_001',
+    trackingId: 'tmtr_0123456789abcdef0123456789abcdef',
+    visitorId: 'visitor_123',
+    sessionId: 'session_123',
+    eventName: 'click',
+    metadata: {
+      x: 4250,
+      y: 3175,
+      viewportX: 5000,
+      viewportY: 2500,
+      scrollPercent: 50,
+      targetTag: 'button',
+      targetId: 'primary-cta',
+    },
+  });
+
+  assert.equal(result.success, true);
+});
+
+test('rejects invalid heatmap click coordinates and unknown metadata', () => {
+  const result = trackEventSchema.safeParse({
+    eventId: 'event_click_002',
+    trackingId: 'tmtr_0123456789abcdef0123456789abcdef',
+    visitorId: 'visitor_123',
+    sessionId: 'session_123',
+    eventName: 'click',
+    metadata: {
+      x: 10001,
+      y: -1,
+      viewportX: 5000,
+      viewportY: 2500,
+      scrollPercent: 50,
+      targetTag: 'button',
+      cursorPath: 'not allowed',
+    },
+  });
+
+  assert.equal(result.success, false);
+});
+
 test('rejects a blank event ID when supplied', () => {
   const result = trackEventSchema.safeParse({
     eventId: '   ',
@@ -57,6 +99,8 @@ test('tracker source creates an event ID for every payload', async () => {
   assert.match(trackerSource, /track\('engagement_time'/);
   assert.match(trackerSource, /track\('form_start'/);
   assert.match(trackerSource, /track\('outbound_click'/);
+  assert.match(trackerSource, /track\('click', \{ metadata: getHeatmapMetadata/);
+  assert.match(trackerSource, /data-tmtr20-no-track/);
 });
 
 test('classifies paid search and normalizes the referral domain', () => {
