@@ -16,6 +16,7 @@ export const trackEventSchema = z.object({
   utmMedium: optionalText(200),
   utmCampaign: optionalText(200),
   utmContent: optionalText(200),
+  utmTerm: optionalText(200),
   device: optionalText(100),
   browser: optionalText(100),
   country: optionalText(100),

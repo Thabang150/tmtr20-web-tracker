@@ -10,11 +10,28 @@ export interface Session {
   source?: string;
   medium?: string;
   campaign?: string;
+  content?: string;
+  term?: string;
+  referralDomain?: string;
+  sourceCategory?: string;
+  firstTouch?: SessionAttribution;
+  lastTouch?: SessionAttribution;
   device?: string;
   startTime: Date;
   endTime?: Date;
   lastActivityAt?: Date;
   pageViews: number;
+}
+
+export interface SessionAttribution {
+  referrer?: string;
+  referralDomain?: string;
+  source?: string;
+  medium?: string;
+  campaign?: string;
+  content?: string;
+  term?: string;
+  sourceCategory?: string;
 }
 
 const sessionSchema = new Schema<Session, Model<Session>>({
@@ -27,6 +44,12 @@ const sessionSchema = new Schema<Session, Model<Session>>({
   source: { type: String, trim: true, maxlength: 200 },
   medium: { type: String, trim: true, maxlength: 200 },
   campaign: { type: String, trim: true, maxlength: 200 },
+  content: { type: String, trim: true, maxlength: 200 },
+  term: { type: String, trim: true, maxlength: 200 },
+  referralDomain: { type: String, trim: true, maxlength: 255 },
+  sourceCategory: { type: String, trim: true, maxlength: 50 },
+  firstTouch: { type: Schema.Types.Mixed },
+  lastTouch: { type: Schema.Types.Mixed },
   device: { type: String, trim: true, maxlength: 100 },
   startTime: { type: Date, required: true },
   endTime: { type: Date },

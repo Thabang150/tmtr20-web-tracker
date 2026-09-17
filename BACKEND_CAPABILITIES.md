@@ -31,7 +31,7 @@ The script runs in the visitor's browser and sends events to `POST /api/track`. 
 - `form_submission`
 - `cta_click`
 
-It also captures anonymous visitor/session IDs, page URL and path, referrer, UTM parameters, device type, browser, and timestamps. It does not collect form values or passwords.
+It also captures anonymous visitor/session IDs, page URL and path, referrer, UTM parameters including `utm_term`, device type, browser, and timestamps. The backend derives a normalized referral domain and classifies traffic as Direct, Organic Search, Paid Search, Social, Paid Social, Video, Referral, Email, or Other. Session records retain first-touch and last-touch acquisition data. It does not collect form values or passwords.
 
 Each new event now has an event ID and schema version. The backend records both the client event timestamp and a server receipt timestamp, rejects timestamps that are more than five minutes in the future or 30 days old, and treats repeated event IDs for the same website as an idempotent duplicate. Sessions also track their latest activity time.
 

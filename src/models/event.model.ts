@@ -25,6 +25,9 @@ export interface Event {
   utmMedium?: string;
   utmCampaign?: string;
   utmContent?: string;
+  utmTerm?: string;
+  referralDomain?: string;
+  sourceCategory?: string;
   device?: string;
   browser?: string;
   country?: string;
@@ -49,6 +52,9 @@ const eventSchema = new Schema<Event, Model<Event>>(
     utmMedium: { type: String, trim: true, maxlength: 200 },
     utmCampaign: { type: String, trim: true, maxlength: 200 },
     utmContent: { type: String, trim: true, maxlength: 200 },
+    utmTerm: { type: String, trim: true, maxlength: 200 },
+    referralDomain: { type: String, trim: true, maxlength: 255 },
+    sourceCategory: { type: String, trim: true, maxlength: 50 },
     device: { type: String, trim: true, maxlength: 100 },
     browser: { type: String, trim: true, maxlength: 100 },
     country: { type: String, trim: true, maxlength: 100 },

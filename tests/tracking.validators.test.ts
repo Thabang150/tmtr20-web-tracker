@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test } from 'node:test';
+import { getAcquisitionData, getReferralDomain } from '../src/utils/acquisition.utils.js';
 import { trackEventSchema } from '../src/validators/tracking.validators.js';
 
 test('accepts a versioned tracker event with an event ID', () => {
@@ -33,4 +34,24 @@ test('tracker source creates an event ID for every payload', async () => {
   const trackerSource = await readFile(path.resolve(process.cwd(), 'public', 'tracker.js'), 'utf8');
 
   assert.match(trackerSource, /eventId:\s*generateId\('event'\)/);
+  assert.match(trackerSource, /utmTerm: params\.get\('utm_term'\)/);
+});
+
+test('classifies paid search and normalizes the referral domain', () => {
+  const acquisition = getAcquisitionData({
+    referrer: 'https://www.google.com/search?q=tmtr20',
+    utmSource: 'google',
+    utmMedium: 'cpc',
+    utmCampaign: 'spring',
+    utmTerm: 'analytics',
+  });
+
+  assert.equal(acquisition.referralDomain, 'www.google.com');
+  assert.equal(acquisition.sourceCategory, 'Paid Search');
+  assert.equal(acquisition.utmTerm, 'analytics');
+});
+
+test('classifies empty acquisition data as direct', () => {
+  assert.equal(getAcquisitionData({}).sourceCategory, 'Direct');
+  assert.equal(getReferralDomain('not-a-url'), undefined);
 });

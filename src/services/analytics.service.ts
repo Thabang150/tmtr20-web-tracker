@@ -101,7 +101,15 @@ export async function getSources(websiteId: Types.ObjectId, range: DateRange) {
     { $match: { websiteId, startTime: { $gte: range.start, $lt: range.end } } },
     {
       $group: {
-        _id: { source: { $ifNull: ['$source', '(direct)'] }, medium: { $ifNull: ['$medium', '(none)'] }, campaign: { $ifNull: ['$campaign', '(none)'] } },
+        _id: {
+          source: { $ifNull: ['$source', '(direct)'] },
+          medium: { $ifNull: ['$medium', '(none)'] },
+          campaign: { $ifNull: ['$campaign', '(none)'] },
+          content: { $ifNull: ['$content', '(none)'] },
+          term: { $ifNull: ['$term', '(none)'] },
+          referralDomain: { $ifNull: ['$referralDomain', '(none)'] },
+          sourceCategory: { $ifNull: ['$sourceCategory', 'Other'] },
+        },
         sessions: { $sum: 1 },
         visitors: { $addToSet: '$visitorId' },
       },
@@ -112,6 +120,10 @@ export async function getSources(websiteId: Types.ObjectId, range: DateRange) {
         source: '$_id.source',
         medium: '$_id.medium',
         campaign: '$_id.campaign',
+        content: '$_id.content',
+        term: '$_id.term',
+        referralDomain: '$_id.referralDomain',
+        sourceCategory: '$_id.sourceCategory',
         sessions: 1,
         visitors: { $size: '$visitors' },
       },
