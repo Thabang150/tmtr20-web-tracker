@@ -19,6 +19,21 @@ test('accepts a versioned tracker event with an event ID', () => {
   assert.equal(result.success, true);
 });
 
+test('accepts behavior event names with bounded metadata', () => {
+  for (const eventName of ['scroll_depth', 'engagement_time', 'outbound_click', 'form_start', 'form_abandonment', 'rage_click', 'dead_click']) {
+    const result = trackEventSchema.safeParse({
+      eventId: `event_${eventName}`,
+      trackingId: 'tmtr_0123456789abcdef0123456789abcdef',
+      visitorId: 'visitor_123',
+      sessionId: 'session_123',
+      eventName,
+      metadata: { depthPercent: 25, activeMs: 15000, formId: 'contact' },
+    });
+
+    assert.equal(result.success, true, eventName);
+  }
+});
+
 test('rejects a blank event ID when supplied', () => {
   const result = trackEventSchema.safeParse({
     eventId: '   ',
@@ -38,6 +53,10 @@ test('tracker source creates an event ID for every payload', async () => {
   assert.match(trackerSource, /utmTerm: params\.get\('utm_term'\)/);
   assert.match(trackerSource, /os: getOperatingSystem\(\)/);
   assert.match(trackerSource, /viewportCategory: getViewportCategory\(\)/);
+  assert.match(trackerSource, /track\('scroll_depth'/);
+  assert.match(trackerSource, /track\('engagement_time'/);
+  assert.match(trackerSource, /track\('form_start'/);
+  assert.match(trackerSource, /track\('outbound_click'/);
 });
 
 test('classifies paid search and normalizes the referral domain', () => {

@@ -226,3 +226,47 @@ async function getAudienceBreakdown(match: Record<string, unknown>, field: strin
     { $sort: { sessions: -1, value: 1 } },
   ]);
 }
+
+export async function getBehavior(websiteId: Types.ObjectId, range: DateRange) {
+  const [scrollDepth, engagement, outboundClicks, forms, interactionProblems] = await Promise.all([
+    EventModel.aggregate([
+      { $match: { ...eventMatch(websiteId, range), eventName: 'scroll_depth' } },
+      { $group: { _id: { pagePath: { $ifNull: ['$pagePath', '(unknown)'] }, depthPercent: '$metadata.depthPercent' }, reached: { $sum: 1 } } },
+      { $project: { _id: 0, pagePath: '$_id.pagePath', depthPercent: '$_id.depthPercent', reached: 1 } },
+      { $sort: { pagePath: 1, depthPercent: 1 } },
+    ]),
+    SessionModel.aggregate([
+      { $match: { websiteId, startTime: { $gte: range.start, $lt: range.end } } },
+      { $group: { _id: null, averageActiveMs: { $avg: '$engagementTimeMs' }, sessions: { $sum: 1 }, maxScrollDepthPercent: { $avg: '$maxScrollDepthPercent' } } },
+      { $project: { _id: 0, averageActiveMs: { $round: ['$averageActiveMs', 0] }, sessions: 1, averageMaxScrollDepthPercent: { $round: ['$maxScrollDepthPercent', 2] } } },
+    ]),
+    EventModel.aggregate([
+      { $match: { ...eventMatch(websiteId, range), eventName: 'outbound_click' } },
+      { $group: { _id: { origin: '$metadata.destinationOrigin', path: '$metadata.destinationPath' }, clicks: { $sum: 1 } } },
+      { $project: { _id: 0, destinationOrigin: '$_id.origin', destinationPath: '$_id.path', clicks: 1 } },
+      { $sort: { clicks: -1 } },
+      { $limit: 100 },
+    ]),
+    EventModel.aggregate([
+      { $match: { ...eventMatch(websiteId, range), eventName: { $in: ['form_start', 'form_submission', 'form_abandonment'] } } },
+      { $group: { _id: { eventName: '$eventName', formId: { $ifNull: ['$metadata.formId', '(unknown)'] } }, count: { $sum: 1 } } },
+      { $project: { _id: 0, eventName: '$_id.eventName', formId: '$_id.formId', count: 1 } },
+      { $sort: { count: -1 } },
+    ]),
+    EventModel.aggregate([
+      { $match: { ...eventMatch(websiteId, range), eventName: { $in: ['rage_click', 'dead_click'] } } },
+      { $group: { _id: { eventName: '$eventName', pagePath: { $ifNull: ['$pagePath', '(unknown)'] } }, count: { $sum: 1 } } },
+      { $project: { _id: 0, eventName: '$_id.eventName', pagePath: '$_id.pagePath', count: 1 } },
+      { $sort: { count: -1 } },
+    ]),
+  ]);
+
+  return {
+    period: periodResponse(range),
+    scrollDepth,
+    engagement: engagement[0] ?? { averageActiveMs: 0, sessions: 0, averageMaxScrollDepthPercent: 0 },
+    outboundClicks,
+    forms,
+    interactionProblems,
+  };
+}

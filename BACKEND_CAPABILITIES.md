@@ -71,6 +71,7 @@ Authenticated website owners can query:
 - Sources and campaigns
 - Top pages
 - Audience breakdowns by device, operating system, language, timezone, viewport category, and screen category
+- Behaviour analytics for scroll depth, active engagement time, outbound clicks, form lifecycle, and interaction problems
 
 Analytics are calculated from stored events and sessions for a requested date range. Audience breakdowns are session-based to avoid repeatedly aggregating stable technology values from every event.
 
@@ -113,6 +114,8 @@ Reports reuse analytics and the latest website audit.
 - Analytics, audits, and reports: `/api/websites/:id/*`
 
 The audience analytics endpoint is `GET /api/websites/:id/audience` and requires dashboard authentication and website ownership.
+
+The behavior analytics endpoint is `GET /api/websites/:id/behavior` and requires dashboard authentication and website ownership. The tracker emits bounded scroll thresholds, visibility-aware engagement intervals, navigation metadata, outbound link events, form starts and abandonments, and conservative rage/dead-click signals. It does not collect form values, keystrokes, exact cursor paths, or full DOM text.
 
 The authenticated dashboard routes remain protected while only the tracker asset and public tracking endpoint are configured for cross-origin use.
 

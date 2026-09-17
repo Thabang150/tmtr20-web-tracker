@@ -23,6 +23,10 @@ export const audience: RequestHandler = async (request, response, next) => {
   await handle(request, response, next, 'audience', analyticsService.getAudience);
 };
 
+export const behavior: RequestHandler = async (request, response, next) => {
+  await handle(request, response, next, 'behavior', analyticsService.getBehavior);
+};
+
 export const topPages: RequestHandler = async (request, response, next) => {
   await handle(request, response, next, 'top-pages', analyticsService.getTopPages);
 };

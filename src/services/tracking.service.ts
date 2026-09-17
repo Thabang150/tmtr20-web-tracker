@@ -73,6 +73,8 @@ export async function trackEvent(input: TrackEventInput): Promise<void> {
       startTime: timestamp,
       endTime: timestamp,
       lastActivityAt: receivedAt,
+      engagementTimeMs: getEngagementTime(input),
+      maxScrollDepthPercent: getScrollDepth(input),
       pageViews: input.eventName === 'page_view' ? 1 : 0,
     });
   } catch (error) {
@@ -105,11 +107,19 @@ async function updateExistingSession(
     });
   }
 
+  const engagementTimeMs = getEngagementTime(input);
+  const scrollDepth = getScrollDepth(input);
+  const increments = {
+    ...(engagementTimeMs > 0 ? { engagementTimeMs } : {}),
+    ...(input.eventName === 'page_view' ? { pageViews: 1 } : {}),
+  };
+
   await SessionModel.updateOne(
     { websiteId, sessionId: input.sessionId },
     {
       $set: update,
-      ...(input.eventName === 'page_view' ? { $inc: { pageViews: 1 } } : {}),
+      ...(Object.keys(increments).length > 0 ? { $inc: increments } : {}),
+      ...(scrollDepth > 0 ? { $max: { maxScrollDepthPercent: scrollDepth } } : {}),
     },
   );
 }
@@ -140,4 +150,18 @@ function toSessionAttribution(acquisition: ReturnType<typeof getAcquisitionData>
     term: acquisition.utmTerm,
     sourceCategory: acquisition.sourceCategory,
   };
+}
+
+function getEngagementTime(input: TrackEventInput): number {
+  if (input.eventName !== 'engagement_time' || !input.metadata || typeof input.metadata.activeMs !== 'number') {
+    return 0;
+  }
+  return Math.min(Math.max(Math.round(input.metadata.activeMs), 0), 60_000);
+}
+
+function getScrollDepth(input: TrackEventInput): number {
+  if (input.eventName !== 'scroll_depth' || !input.metadata || typeof input.metadata.depthPercent !== 'number') {
+    return 0;
+  }
+  return Math.min(Math.max(Math.round(input.metadata.depthPercent), 0), 100);
 }

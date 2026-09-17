@@ -8,6 +8,13 @@ export const EVENT_NAMES = [
   'email_click',
   'form_submission',
   'cta_click',
+  'scroll_depth',
+  'engagement_time',
+  'outbound_click',
+  'form_start',
+  'form_abandonment',
+  'rage_click',
+  'dead_click',
 ] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
 

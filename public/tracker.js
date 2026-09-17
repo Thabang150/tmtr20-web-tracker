@@ -17,6 +17,10 @@
     'talk to us',
     'get a quote',
   ];
+  const SCROLL_THRESHOLDS = [25, 50, 75, 90, 100];
+  const ENGAGEMENT_HEARTBEAT_MS = 15 * 1000;
+  const RAGE_CLICK_WINDOW_MS = 1000;
+  const RAGE_CLICK_COOLDOWN_MS = 3000;
 
   const scriptElement = document.currentScript || Array.from(document.querySelectorAll('script[data-site-id]')).at(-1);
   if (!scriptElement) {
@@ -278,18 +282,144 @@
 
   let lastTrackedPage = '';
 
-  function trackPageView(force = false) {
+  let previousPagePath;
+  let scrollFrame = 0;
+  let trackedScrollThresholds = new Set();
+  let activeSince = document.visibilityState === 'hidden' ? null : Date.now();
+  let engagementTimer;
+  const startedForms = new Map();
+  const rageClicks = new WeakMap();
+
+  function trackPageView(force = false, navigationType = 'initial') {
     const nextPage = window.location.href;
     if (!force && nextPage === lastTrackedPage) {
       return;
     }
 
+    const oldPagePath = lastTrackedPage ? new URL(lastTrackedPage).pathname : previousPagePath;
     lastTrackedPage = nextPage;
     track('page_view', {
       pageUrl: nextPage,
       pagePath: window.location.pathname + window.location.search,
       referrer: getReferrer(),
+      metadata: {
+        navigationType,
+        ...(oldPagePath ? { previousPagePath: oldPagePath } : {}),
+      },
     });
+    previousPagePath = window.location.pathname;
+    resetPageBehavior();
+  }
+
+  function resetPageBehavior() {
+    trackedScrollThresholds = new Set();
+  }
+
+  function getScrollPercent() {
+    const documentHeight = Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight || 0);
+    const scrollableHeight = documentHeight - window.innerHeight;
+    if (scrollableHeight <= 0) return 100;
+    return Math.min(100, Math.round(((window.scrollY || window.pageYOffset || 0) / scrollableHeight) * 100));
+  }
+
+  function handleScroll() {
+    if (scrollFrame) return;
+    scrollFrame = window.requestAnimationFrame(() => {
+      scrollFrame = 0;
+      const percent = getScrollPercent();
+      for (const threshold of SCROLL_THRESHOLDS) {
+        if (percent >= threshold && !trackedScrollThresholds.has(threshold)) {
+          trackedScrollThresholds.add(threshold);
+          track('scroll_depth', { metadata: { depthPercent: threshold } });
+        }
+      }
+    });
+  }
+
+  function flushEngagement(reason) {
+    if (activeSince === null) return;
+    const intervalMs = Math.min(Math.max(Date.now() - activeSince, 0), ENGAGEMENT_HEARTBEAT_MS * 2);
+    activeSince = Date.now();
+    if (intervalMs < 1000) return;
+    track('engagement_time', { metadata: { activeMs: intervalMs, intervalMs, reason } });
+  }
+
+  function handleVisibilityChange() {
+    if (document.visibilityState === 'hidden') {
+      flushEngagement('hidden');
+      handleFormAbandonment();
+      return;
+    }
+    activeSince = Date.now();
+  }
+
+  function handlePageHide() {
+    flushEngagement('pagehide');
+    handleFormAbandonment();
+  }
+
+  function getFormId(form) {
+    return (form.getAttribute('data-tmtr20-id') || form.id || form.getAttribute('name') || 'form').slice(0, 100);
+  }
+
+  function handleFormStart(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const form = target.closest('form');
+    if (!form || startedForms.has(form)) return;
+    const formId = getFormId(form);
+    startedForms.set(form, { formId, submitted: false });
+    track('form_start', { metadata: { formId } });
+  }
+
+  function handleFormAbandonment() {
+    for (const state of startedForms.values()) {
+      if (!state.submitted && !state.abandoned) {
+        state.abandoned = true;
+        track('form_abandonment', { metadata: { formId: state.formId } });
+      }
+    }
+  }
+
+  function getSafeOutboundDestination(href) {
+    try {
+      const destination = new URL(href, window.location.href);
+      if (!['http:', 'https:'].includes(destination.protocol) || destination.origin === window.location.origin) return null;
+      return {
+        destinationOrigin: destination.origin,
+        destinationPath: destination.pathname,
+        linkType: destination.protocol.slice(0, -1),
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function getClickTargetId(element) {
+    return (element.getAttribute('data-tmtr20-id') || element.id || element.tagName.toLowerCase()).slice(0, 100);
+  }
+
+  function handleBehaviorClick(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    const now = Date.now();
+    const clickState = rageClicks.get(target) || { times: [], cooldownUntil: 0 };
+    clickState.times = clickState.times.filter((time) => now - time <= RAGE_CLICK_WINDOW_MS);
+    clickState.times.push(now);
+    if (clickState.times.length >= 3 && now >= clickState.cooldownUntil) {
+      clickState.cooldownUntil = now + RAGE_CLICK_COOLDOWN_MS;
+      track('rage_click', { metadata: { targetId: getClickTargetId(target), targetTag: target.tagName.toLowerCase(), clickCount: clickState.times.length } });
+    }
+    rageClicks.set(target, clickState);
+
+    if (target.closest('a, button, input, select, textarea, [role="button"], [contenteditable="true"]')) return;
+    const activeElement = document.activeElement;
+    window.setTimeout(() => {
+      if (!event.defaultPrevented && document.activeElement === activeElement) {
+        track('dead_click', { metadata: { targetId: getClickTargetId(target), targetTag: target.tagName.toLowerCase() } });
+      }
+    }, 700);
   }
 
   function normalizeText(value) {
@@ -391,6 +521,11 @@
       return;
     }
 
+    const outboundDestination = getSafeOutboundDestination(href);
+    if (outboundDestination) {
+      track('outbound_click', { metadata: outboundDestination });
+    }
+
     const label = normalizeText(getElementText(target));
     track('cta_click', {
       pageUrl: window.location.href,
@@ -408,7 +543,9 @@
       return;
     }
 
-    const formName = form.getAttribute('id') || form.getAttribute('name') || form.getAttribute('data-name') || form.getAttribute('action') || 'unknown';
+    const formState = startedForms.get(form);
+    if (formState) formState.submitted = true;
+    const formName = getFormId(form);
     track('form_submission', {
       pageUrl: window.location.href,
       pagePath: window.location.pathname + window.location.search,
@@ -432,31 +569,43 @@
 
     document.addEventListener('click', handleOutboundLink, true);
     document.addEventListener('click', handleClickableCta, true);
+    document.addEventListener('click', handleBehaviorClick, true);
+    document.addEventListener('focusin', handleFormStart, true);
+    document.addEventListener('input', handleFormStart, true);
     document.addEventListener('submit', handleFormSubmit, true);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    engagementTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') flushEngagement('heartbeat');
+    }, ENGAGEMENT_HEARTBEAT_MS);
 
     const pushState = window.history.pushState;
     window.history.pushState = function (...args) {
+      flushEngagement('navigation');
       const result = pushState.apply(this, args);
       setTimeout(() => {
         ensureSessionStarted();
-        trackPageView(true);
+        trackPageView(true, 'pushState');
       }, 0);
       return result;
     };
 
     const replaceState = window.history.replaceState;
     window.history.replaceState = function (...args) {
+      flushEngagement('navigation');
       const result = replaceState.apply(this, args);
       setTimeout(() => {
         ensureSessionStarted();
-        trackPageView(true);
+        trackPageView(true, 'replaceState');
       }, 0);
       return result;
     };
 
     window.addEventListener('popstate', () => {
+      flushEngagement('navigation');
       ensureSessionStarted();
-      trackPageView(true);
+      trackPageView(true, 'popstate');
     });
   }
 

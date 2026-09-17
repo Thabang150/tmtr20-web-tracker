@@ -25,6 +25,8 @@ export interface Session {
   startTime: Date;
   endTime?: Date;
   lastActivityAt?: Date;
+  engagementTimeMs: number;
+  maxScrollDepthPercent: number;
   pageViews: number;
 }
 
@@ -64,6 +66,8 @@ const sessionSchema = new Schema<Session, Model<Session>>({
   startTime: { type: Date, required: true },
   endTime: { type: Date },
   lastActivityAt: { type: Date },
+  engagementTimeMs: { type: Number, required: true, default: 0, min: 0 },
+  maxScrollDepthPercent: { type: Number, required: true, default: 0, min: 0, max: 100 },
   pageViews: { type: Number, required: true, default: 0, min: 0 },
 });
 
