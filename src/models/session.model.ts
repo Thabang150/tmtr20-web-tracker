@@ -13,6 +13,7 @@ export interface Session {
   device?: string;
   startTime: Date;
   endTime?: Date;
+  lastActivityAt?: Date;
   pageViews: number;
 }
 
@@ -29,6 +30,7 @@ const sessionSchema = new Schema<Session, Model<Session>>({
   device: { type: String, trim: true, maxlength: 100 },
   startTime: { type: Date, required: true },
   endTime: { type: Date },
+  lastActivityAt: { type: Date },
   pageViews: { type: Number, required: true, default: 0, min: 0 },
 });
 

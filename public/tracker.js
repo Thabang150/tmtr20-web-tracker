@@ -163,6 +163,7 @@
   function buildPayload(eventName, extra = {}) {
     const session = getOrCreateSession();
     const payload = {
+      eventId: generateId('event'),
       trackingId: siteId,
       visitorId: getVisitorId(),
       sessionId: session.sessionId,
