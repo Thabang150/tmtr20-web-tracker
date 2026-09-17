@@ -14,6 +14,7 @@ import { websiteRouter } from './routes/website.routes.js';
 import { websiteAuditRouter } from './routes/website-audit.routes.js';
 import { reportRouter } from './routes/report.routes.js';
 import { trackingRouter } from './routes/tracking.routes.js';
+import { funnelRouter } from './routes/funnel.routes.js';
 
 export const app = express();
 
@@ -67,6 +68,7 @@ app.use('/api/websites', analyticsRouter);
 app.use('/api/websites', websiteAuditRouter);
 app.use('/api/websites', reportRouter);
 app.use('/api/websites', websiteRouter);
+app.use('/api/websites', funnelRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

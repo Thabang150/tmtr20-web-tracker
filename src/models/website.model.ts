@@ -3,6 +3,23 @@ import { HydratedDocument, Model, Schema, Types, model } from 'mongoose';
 export const WEBSITE_STATUSES = ['ACTIVE', 'PAUSED', 'ARCHIVED'] as const;
 export type WebsiteStatus = (typeof WEBSITE_STATUSES)[number];
 
+export interface FunnelStep {
+  key: string;
+  name: string;
+  eventName: string;
+  pagePath?: string;
+  pagePathPrefix?: string;
+}
+
+export interface Funnel {
+  key: string;
+  name: string;
+  active: boolean;
+  steps: FunnelStep[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Website {
   ownerId: Types.ObjectId;
   name: string;
@@ -11,6 +28,7 @@ export interface Website {
   trackingId: string;
   timezone: string;
   status: WebsiteStatus;
+  funnels: Funnel[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,6 +44,7 @@ const websiteSchema = new Schema<Website, Model<Website>>(
     trackingId: { type: String, required: true, unique: true, index: true },
     timezone: { type: String, required: true, default: 'UTC' },
     status: { type: String, enum: WEBSITE_STATUSES, required: true, default: 'ACTIVE' },
+    funnels: { type: Schema.Types.Mixed, default: [] },
   },
   { timestamps: true },
 );

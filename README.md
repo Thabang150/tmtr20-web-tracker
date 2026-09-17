@@ -116,6 +116,8 @@ http POST :3000/api/track `
 
 Accepted events return `202` with `{ "accepted": true }`. Events are tied to the website resolved from the tracking ID. Sessions are upserted by `(websiteId, sessionId)` and page-view events increment their page-view count.
 
+Conversion analytics are available through the authenticated `GET /api/websites/:id/conversions` endpoint. The response includes conversion event totals, unique converting sessions, conversion breakdowns by page/source/device, and a session-based conversion rate. Website owners can define bounded funnels with `GET/POST /api/websites/:id/funnels` and evaluate one with `?funnel=<key>`.
+
 The `click` event stores only normalized, bucketable coordinates for heatmap aggregation. It excludes form controls and editable content, and the backend does not store screenshots, cursor paths, or session video. Behavior and heatmap aggregates are available through the authenticated `GET /api/websites/:id/behavior` endpoint.
 
 ## Real website tracking script

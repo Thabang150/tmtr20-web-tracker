@@ -12,7 +12,18 @@ export const traffic: RequestHandler = async (request, response, next) => {
 };
 
 export const conversions: RequestHandler = async (request, response, next) => {
-  await handle(request, response, next, 'conversions', analyticsService.getConversions);
+  try {
+    if (!request.user) throw new AppError(401, 'UNAUTHENTICATED', 'Authentication is required');
+    const websiteId = getWebsiteId(request);
+    const dateRange = analyticsDateRangeSchema.safeParse(request.query);
+    if (!dateRange.success) throw new AppError(400, 'VALIDATION_ERROR', 'startDate and endDate must be valid');
+    const ownedWebsiteId = await analyticsService.assertWebsiteAccess(request.user.id, websiteId);
+    const funnelKey = typeof request.query.funnel === 'string' ? request.query.funnel : undefined;
+    const data = await analyticsService.getConversions(ownedWebsiteId, toUtcDateRange(dateRange.data), funnelKey);
+    response.json({ success: true, data, message: 'conversions analytics retrieved successfully' });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const sources: RequestHandler = async (request, response, next) => {

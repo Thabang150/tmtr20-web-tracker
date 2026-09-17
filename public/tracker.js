@@ -551,6 +551,7 @@
     }
 
     const label = normalizeText(getElementText(target));
+    const href = (target.getAttribute('href') || '').trim();
     track('cta_click', {
       pageUrl: window.location.href,
       pagePath: window.location.pathname + window.location.search,

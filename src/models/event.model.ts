@@ -18,6 +18,13 @@ export const EVENT_NAMES = [
   'click',
 ] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
+export const CONVERSION_EVENT_NAMES = [
+  'whatsapp_click',
+  'phone_click',
+  'email_click',
+  'form_submission',
+  'cta_click',
+] as const;
 
 export interface Event {
   eventId: string;
@@ -85,6 +92,8 @@ const eventSchema = new Schema<Event, Model<Event>>(
 
 eventSchema.index({ websiteId: 1, timestamp: 1 });
 eventSchema.index({ websiteId: 1, eventName: 1, timestamp: 1 });
+eventSchema.index({ websiteId: 1, timestamp: 1, sessionId: 1, eventName: 1 });
+eventSchema.index({ websiteId: 1, eventName: 1, pagePath: 1, timestamp: 1 });
 eventSchema.index({ websiteId: 1, eventId: 1 }, { unique: true, sparse: true });
 eventSchema.index({ websiteId: 1, visitorId: 1 });
 eventSchema.index({ websiteId: 1, sessionId: 1 });

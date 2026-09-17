@@ -4,6 +4,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { getAcquisitionData, getReferralDomain } from '../src/utils/acquisition.utils.js';
 import { normalizeAudience } from '../src/utils/audience.utils.js';
+import { funnelSchema } from '../src/validators/funnel.validators.js';
 import { trackEventSchema } from '../src/validators/tracking.validators.js';
 
 test('accepts a versioned tracker event with an event ID', () => {
@@ -144,4 +145,31 @@ test('normalizes supported audience fields and removes invalid values', () => {
     viewportCategory: undefined,
     screenCategory: undefined,
   });
+});
+
+test('accepts a bounded ordered conversion funnel', () => {
+  const result = funnelSchema.safeParse({
+    key: 'lead-generation',
+    name: 'Lead generation',
+    active: true,
+    steps: [
+      { key: 'landing', name: 'Landing', eventName: 'page_view', pagePath: '/services' },
+      { key: 'submit', name: 'Submit', eventName: 'form_submission', pagePath: '/contact' },
+    ],
+  });
+
+  assert.equal(result.success, true);
+});
+
+test('rejects invalid funnel step definitions', () => {
+  const result = funnelSchema.safeParse({
+    key: 'bad funnel',
+    name: 'Invalid',
+    steps: [
+      { key: 'same', name: 'One', eventName: 'page_view', pagePath: '/a', pagePathPrefix: '/a' },
+      { key: 'same', name: 'Two', eventName: 'page_view', pagePath: '/b' },
+    ],
+  });
+
+  assert.equal(result.success, false);
 });

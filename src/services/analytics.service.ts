@@ -3,14 +3,10 @@ import { EventModel } from '../models/event.model.js';
 import { SessionModel } from '../models/session.model.js';
 import { WebsiteModel } from '../models/website.model.js';
 import { AppError } from '../middleware/error-handler.js';
+import { CONVERSION_EVENT_NAMES, type EventName } from '../models/event.model.js';
+import type { Funnel, FunnelStep } from '../models/website.model.js';
 
-const CONVERSION_EVENTS = [
-  'whatsapp_click',
-  'phone_click',
-  'email_click',
-  'form_submission',
-  'cta_click',
-] as const;
+const CONVERSION_EVENTS = CONVERSION_EVENT_NAMES;
 
 interface DateRange {
   start: Date;
@@ -51,7 +47,7 @@ export async function getOverview(websiteId: Types.ObjectId, range: DateRange) {
     pagesPerSession: summary.sessions ? round(summary.pageViews / summary.sessions) : 0,
     averageSessionDurationSeconds: sessionSummary.averageDurationSeconds,
     conversions: conversions.total,
-    conversionRate: summary.sessions ? round((conversions.total / summary.sessions) * 100) : 0,
+    conversionRate: summary.sessions ? round((conversions.convertingSessions / summary.sessions) * 100) : 0,
     conversionBreakdown: conversions.breakdown,
   };
 }
@@ -85,14 +81,29 @@ export async function getTraffic(websiteId: Types.ObjectId, range: DateRange) {
   return { period: periodResponse(range), summary, trend };
 }
 
-export async function getConversions(websiteId: Types.ObjectId, range: DateRange) {
+export async function getConversions(websiteId: Types.ObjectId, range: DateRange, funnelKey?: string) {
   const conversions = await getConversionSummary(websiteId, range);
   const summary = await getEventSummary(websiteId, range);
+
+  if (funnelKey) {
+    const website = await WebsiteModel.findById(websiteId).select('funnels').lean();
+    const funnel = (website?.funnels ?? []).find((value: Funnel) => value.key === funnelKey && value.active);
+    if (!funnel) throw new AppError(404, 'FUNNEL_NOT_FOUND', 'Active funnel not found');
+    const funnelResult = await evaluateFunnel(websiteId, range, funnel);
+    return {
+      period: periodResponse(range),
+      funnel: { key: funnel.key, name: funnel.name },
+      steps: funnelResult.steps,
+      completedSessions: funnelResult.completedSessions,
+      conversionRate: summary.sessions ? round((funnelResult.completedSessions / summary.sessions) * 100) : 0,
+    };
+  }
 
   return {
     period: periodResponse(range),
     ...conversions,
-    conversionRate: summary.sessions ? round((conversions.total / summary.sessions) * 100) : 0,
+    sessions: summary.sessions,
+    conversionRate: summary.sessions ? round((conversions.convertingSessions / summary.sessions) * 100) : 0,
   };
 }
 
@@ -166,12 +177,81 @@ async function getEventSummary(websiteId: Types.ObjectId, range: DateRange): Pro
 async function getConversionSummary(websiteId: Types.ObjectId, range: DateRange) {
   const rows = await EventModel.aggregate([
     { $match: { ...eventMatch(websiteId, range), eventName: { $in: CONVERSION_EVENTS } } },
-    { $group: { _id: '$eventName', count: { $sum: 1 } } },
+    { $group: { _id: '$eventName', count: { $sum: 1 }, sessions: { $addToSet: '$sessionId' } } },
   ]);
   const breakdown = Object.fromEntries(CONVERSION_EVENTS.map((eventName) => [eventName, 0]));
-  for (const row of rows) breakdown[row._id] = row.count;
+  const convertingSessions = new Set<string>();
+  for (const row of rows) {
+    breakdown[row._id] = row.count;
+    row.sessions.forEach((sessionId: string) => convertingSessions.add(sessionId));
+  }
 
-  return { total: Object.values(breakdown).reduce((total, count) => total + count, 0), breakdown };
+  const [byPage, bySource, byDevice] = await Promise.all([
+    getConversionDimension(websiteId, range, { pagePath: { $ifNull: ['$pagePath', '(unknown)'] } }, 'pagePath'),
+    getConversionDimension(websiteId, range, { source: { $ifNull: ['$utmSource', '(direct)'] }, medium: { $ifNull: ['$utmMedium', '(none)'] }, sourceCategory: { $ifNull: ['$sourceCategory', 'Other'] } }, 'source'),
+    getConversionDimension(websiteId, range, { device: { $ifNull: ['$device', '(unknown)'] } }, 'device'),
+  ]);
+
+  return {
+    total: Object.values(breakdown).reduce((total, count) => total + count, 0),
+    conversionEvents: Object.values(breakdown).reduce((total, count) => total + count, 0),
+    convertingSessions: convertingSessions.size,
+    breakdown,
+    byPage,
+    bySource,
+    byDevice,
+  };
+}
+
+async function getConversionDimension(websiteId: Types.ObjectId, range: DateRange, group: Record<string, unknown>, name: string) {
+  return EventModel.aggregate([
+    { $match: { ...eventMatch(websiteId, range), eventName: { $in: CONVERSION_EVENTS } } },
+    { $group: { _id: group, conversionEvents: { $sum: 1 }, sessions: { $addToSet: '$sessionId' } } },
+    { $project: { _id: 0, [name]: '$_id', conversionEvents: 1, convertingSessions: { $size: '$sessions' } } },
+    { $sort: { conversionEvents: -1 } },
+    { $limit: 100 },
+  ]);
+}
+
+async function getFunnelEvents(websiteId: Types.ObjectId, range: DateRange) {
+  return EventModel.find(eventMatch(websiteId, range), 'sessionId eventName pagePath timestamp')
+    .sort({ sessionId: 1, timestamp: 1 })
+    .lean();
+}
+
+async function evaluateFunnel(websiteId: Types.ObjectId, range: DateRange, funnel: Funnel) {
+  const events = await getFunnelEvents(websiteId, range);
+  const sessions = groupFunnelEvents(events);
+  const counts = funnel.steps.map((step) => ({ key: step.key, sessions: 0, rate: 0 }));
+  const completed = new Set<string>();
+  for (const [sessionId, sessionEvents] of sessions) {
+    let stepIndex = 0;
+    for (const event of sessionEvents) {
+      if (matchesFunnelStep(event, funnel.steps[stepIndex])) {
+        counts[stepIndex].sessions += 1;
+        stepIndex += 1;
+        if (stepIndex === funnel.steps.length) { completed.add(sessionId); break; }
+      }
+    }
+  }
+  const base = counts[0]?.sessions || 0;
+  return {
+    steps: counts.map((step) => ({ ...step, rate: base ? round((step.sessions / base) * 100) : 0 })),
+    completedSessions: completed.size,
+  };
+}
+
+function groupFunnelEvents(events: Array<{ sessionId: string; eventName: string; pagePath?: string }>) {
+  const sessions = new Map<string, typeof events>();
+  for (const event of events) sessions.set(event.sessionId, [...(sessions.get(event.sessionId) ?? []), event]);
+  return sessions;
+}
+
+function matchesFunnelStep(event: { eventName: string; pagePath?: string }, step?: FunnelStep) {
+  if (!step || event.eventName !== step.eventName) return false;
+  if (step.pagePath && event.pagePath !== step.pagePath) return false;
+  if (step.pagePathPrefix && !event.pagePath?.startsWith(step.pagePathPrefix)) return false;
+  return true;
 }
 
 async function getSessionSummary(websiteId: Types.ObjectId, range: DateRange) {

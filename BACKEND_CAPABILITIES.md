@@ -72,6 +72,8 @@ Authenticated website owners can query:
 - Top pages
 - Audience breakdowns by device, operating system, language, timezone, viewport category, and screen category
 - Behaviour analytics for scroll depth, active engagement time, outbound clicks, form lifecycle, and interaction problems
+- Conversion analytics by event, page, source, device, and unique converting session
+- Website-owned conversion funnel definitions and ordered funnel reporting
 
 Analytics are calculated from stored events and sessions for a requested date range. Audience breakdowns are session-based to avoid repeatedly aggregating stable technology values from every event.
 
@@ -116,6 +118,8 @@ Reports reuse analytics and the latest website audit.
 The audience analytics endpoint is `GET /api/websites/:id/audience` and requires dashboard authentication and website ownership.
 
 The behavior analytics endpoint is `GET /api/websites/:id/behavior` and requires dashboard authentication and website ownership. The tracker emits bounded scroll thresholds, visibility-aware engagement intervals, navigation metadata, outbound link events, form starts and abandonments, and conservative rage/dead-click signals. It does not collect form values, keystrokes, exact cursor paths, or full DOM text.
+
+Conversion analytics are available at `GET /api/websites/:id/conversions`. Headline conversion rate is based on unique sessions containing at least one conversion event; total conversion event count remains available separately. Optional funnel definitions are managed through `GET/POST /api/websites/:id/funnels`, `PATCH/DELETE /api/websites/:id/funnels/:funnelKey`, and evaluated with `?funnel=<key>` on the conversions endpoint.
 
 Behavior analytics also includes a heatmap data foundation. The tracker emits one normalized `click` point per ordinary click, excluding form controls, editable content, and elements marked with `data-tmtr20-no-track`. Coordinates are stored as integer basis points and aggregated into 1% page-position cells. The system stores no screenshots, cursor paths, or session video.
 
