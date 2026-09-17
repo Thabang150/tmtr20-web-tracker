@@ -21,7 +21,14 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(helmet());
 const allowedOrigins = env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean);
-app.use(cors({ origin: allowedOrigins.includes('*') ? true : allowedOrigins }));
+const dashboardCors = cors({ origin: allowedOrigins.includes('*') ? true : allowedOrigins });
+app.use((request, response, next) => {
+  if (request.path === '/api/track') {
+    next();
+    return;
+  }
+  dashboardCors(request, response, next);
+});
 
 const trackingCors = cors({
   origin: (_origin, callback) => callback(null, true),
@@ -45,6 +52,7 @@ app.get('/tracker.js', async (_request, response, next) => {
   try {
     const trackerPath = path.resolve(process.cwd(), 'public', 'tracker.js');
     const trackerSource = await readFile(trackerPath, 'utf8');
+    response.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     response.type('application/javascript').send(trackerSource.replaceAll('__TMTR20_TRACKING_API_URL__', env.TRACKING_API_URL));
   } catch (error) {
     next(error);
