@@ -6,6 +6,15 @@ export interface AuditIssue {
   message: string;
 }
 
+export interface AuditDetails {
+  performance?: Record<string, unknown>;
+  seo?: Record<string, unknown>;
+  accessibility?: Record<string, unknown>;
+  security?: Record<string, unknown>;
+  resources?: Array<Record<string, unknown>>;
+  javascript?: { runtimeErrorsAvailable: boolean; errors: string[] };
+}
+
 export interface WebsiteAudit {
   websiteId: Types.ObjectId;
   scanDate: Date;
@@ -22,6 +31,7 @@ export interface WebsiteAudit {
   pageCount: number;
   issues: AuditIssue[];
   recommendations: string[];
+  details?: AuditDetails;
   createdAt: Date;
 }
 
@@ -53,6 +63,7 @@ const websiteAuditSchema = new Schema<WebsiteAudit, Model<WebsiteAudit>>(
     pageCount: { type: Number, required: true, min: 0 },
     issues: { type: [auditIssueSchema], required: true, default: [] },
     recommendations: { type: [String], required: true, default: [] },
+    details: { type: Schema.Types.Mixed },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );

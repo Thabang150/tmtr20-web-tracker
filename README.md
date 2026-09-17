@@ -189,7 +189,7 @@ All audit routes require `Authorization: Bearer <accessToken>` and ownership of 
 - `GET /api/websites/:id/audits` returns historical audits, newest first.
 - `GET /api/websites/:id/audits/latest` returns the newest audit or `null`.
 
-The current audit engine checks HTTP status, response time, HTTPS, title, meta description, H1, viewport, robots.txt, sitemap.xml, and selected security headers. Each run is saved as a separate historical document. The engine is intentionally lightweight and can later be extended with PageSpeed or Lighthouse integrations.
+The current audit engine checks HTTP status, response time, HTTPS, title, meta description, H1, viewport, robots.txt, sitemap.xml, and selected security headers. Results also include bounded server-observed details for SEO, basic accessibility, security headers, mixed content, and same-origin resource statuses. Each run is saved as a separate historical document. The engine does not claim to measure Core Web Vitals, browser JavaScript runtime errors, or provide a complete security/accessibility assessment.
 
 Example:
 

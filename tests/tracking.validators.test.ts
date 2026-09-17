@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { getAcquisitionData, getReferralDomain } from '../src/utils/acquisition.utils.js';
 import { normalizeAudience } from '../src/utils/audience.utils.js';
 import { funnelSchema } from '../src/validators/funnel.validators.js';
+import { isPrivateAddress } from '../src/services/website-audit.service.js';
 import { trackEventSchema } from '../src/validators/tracking.validators.js';
 
 test('accepts a versioned tracker event with an event ID', () => {
@@ -172,4 +173,12 @@ test('rejects invalid funnel step definitions', () => {
   });
 
   assert.equal(result.success, false);
+});
+
+test('blocks private IPv4 and IPv6 audit addresses', () => {
+  assert.equal(isPrivateAddress('127.0.0.1'), true);
+  assert.equal(isPrivateAddress('172.16.0.10'), true);
+  assert.equal(isPrivateAddress('192.168.1.20'), true);
+  assert.equal(isPrivateAddress('::1'), true);
+  assert.equal(isPrivateAddress('8.8.8.8'), false);
 });

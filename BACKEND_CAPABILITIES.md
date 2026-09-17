@@ -88,7 +88,7 @@ Authenticated users can run and view website audits. Audits currently inspect it
 - `robots.txt` and sitemap
 - Selected security headers
 
-Audit results are saved historically, with latest-audit access available.
+Audit results are saved historically, with latest-audit access available. They also include bounded server-observed details for response metadata, SEO signals, canonical/lang/Open Graph/structured-data presence, image alternative-text checks, basic landmarks and form-label signals, security-header inventory, mixed-content references, and up to 20 same-origin resource status checks. Browser-only metrics such as LCP, CLS, INP, console errors, and runtime JavaScript failures are reported as unavailable rather than inferred.
 
 ## Monthly reports
 
@@ -132,5 +132,6 @@ The authenticated dashboard routes remain protected while only the tracker asset
 - Analytics depend on the tracker successfully loading and the event request reaching the backend.
 - MongoDB is required for event, session, user, website, audit, token, and report persistence.
 - The current tracker is intentionally lightweight and does not provide consent management, bot filtering, advanced attribution, real-time dashboards, or custom event definitions yet.
+- Website audits are static server-side checks, not complete Lighthouse, accessibility, security, or browser-runtime assessments. Audit requests are rate-limited and outbound responses are size-bounded.
 
 This document is a baseline for planning future upgrades.
