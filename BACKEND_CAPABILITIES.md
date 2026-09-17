@@ -75,6 +75,7 @@ Authenticated website owners can query:
 - Conversion analytics by event, page, source, device, and unique converting session
 - Website-owned conversion funnel definitions and ordered funnel reporting
 - Cross-dimension intelligence connecting acquisition, landing pages, devices, behavior, and conversions
+- Deterministic intelligence insights with comparison periods, stable rule IDs, structured evidence, and recommendations
 
 Analytics are calculated from stored events and sessions for a requested date range. Audience breakdowns are session-based to avoid repeatedly aggregating stable technology values from every event.
 
@@ -123,6 +124,8 @@ The behavior analytics endpoint is `GET /api/websites/:id/behavior` and requires
 Conversion analytics are available at `GET /api/websites/:id/conversions`. Headline conversion rate is based on unique sessions containing at least one conversion event; total conversion event count remains available separately. Optional funnel definitions are managed through `GET/POST /api/websites/:id/funnels`, `PATCH/DELETE /api/websites/:id/funnels/:funnelKey`, and evaluated with `?funnel=<key>` on the conversions endpoint.
 
 Cross-dimension intelligence is available at `GET /api/websites/:id/intelligence`. It returns bounded aggregate rows connecting source category, source, medium, campaign, landing page, and device with sessions, visitors, conversions, engagement time, scroll depth, and recorded last pages. It never returns visitor IDs or session IDs.
+
+The same endpoint returns deterministic opportunities, problems, trends, anomalies, and recommendation IDs. Rules use minimum sample thresholds and equal-length UTC comparison periods. They describe measured patterns, not causal explanations or AI-generated conclusions. Frontend clients should render stable insight IDs and structured evidence rather than parsing message text.
 
 Behavior analytics also includes a heatmap data foundation. The tracker emits one normalized `click` point per ordinary click, excluding form controls, editable content, and elements marked with `data-tmtr20-no-track`. Coordinates are stored as integer basis points and aggregated into 1% page-position cells. The system stores no screenshots, cursor paths, or session video.
 

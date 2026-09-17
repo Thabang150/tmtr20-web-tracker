@@ -369,6 +369,23 @@ export async function getBehavior(websiteId: Types.ObjectId, range: DateRange) {
 }
 
 export async function getIntelligence(websiteId: Types.ObjectId, range: DateRange) {
+  const current = await getIntelligenceSnapshot(websiteId, range);
+  const durationMs = range.end.getTime() - range.start.getTime();
+  const comparisonRange = { start: new Date(range.start.getTime() - durationMs), end: range.start };
+  const comparison = await getIntelligenceSnapshot(websiteId, comparisonRange);
+  const insights = buildInsights(current, comparison);
+
+  return {
+    period: periodResponse(range),
+    comparison: { ...periodResponse(comparisonRange), available: comparison.totals.sessions >= 30 },
+    totals: current.totals,
+    rows: current.rows,
+    exitPages: current.exitPages,
+    insights,
+  };
+}
+
+async function getIntelligenceSnapshot(websiteId: Types.ObjectId, range: DateRange) {
   const [result] = await SessionModel.aggregate([
     { $match: { websiteId, startTime: { $gte: range.start, $lt: range.end } } },
     {
@@ -380,6 +397,8 @@ export async function getIntelligence(websiteId: Types.ObjectId, range: DateRang
             { $eq: ['$sessionId', '$$sessionId'] },
             { $eq: ['$websiteId', '$$websiteId'] },
             { $in: ['$eventName', CONVERSION_EVENTS] },
+            { $gte: ['$timestamp', range.start] },
+            { $lt: ['$timestamp', range.end] },
           ] } } },
           { $project: { eventName: 1 } },
         ],
@@ -472,9 +491,92 @@ export async function getIntelligence(websiteId: Types.ObjectId, range: DateRang
   ]);
 
   return {
-    period: periodResponse(range),
     totals: result?.totals[0] ?? { sessions: 0, visitors: 0, conversions: 0, convertingSessions: 0, conversionRate: 0, averageEngagementTimeMs: 0, averageScrollDepthPercent: 0 },
     rows: result?.rows ?? [],
     exitPages: result?.exitPages ?? [],
   };
+}
+
+type IntelligenceSnapshot = Awaited<ReturnType<typeof getIntelligenceSnapshot>>;
+
+interface Insight {
+  id: string;
+  severity: 'low' | 'medium' | 'high';
+  title: string;
+  message: string;
+  scope: Record<string, string>;
+  evidence: Array<Record<string, number | string>>;
+  recommendationId: string;
+}
+
+function buildInsights(current: IntelligenceSnapshot, comparison: IntelligenceSnapshot) {
+  const opportunities: Insight[] = [];
+  const problems: Insight[] = [];
+  const trends: Insight[] = [];
+  const anomalies: Insight[] = [];
+  const recommendations = new Set<string>();
+
+  if (current.totals.sessions >= 30 && comparison.totals.sessions >= 30) {
+    const sessionChange = percentageChange(current.totals.sessions, comparison.totals.sessions);
+    if (Math.abs(sessionChange) >= 20 && Math.abs(current.totals.sessions - comparison.totals.sessions) >= 10) {
+      const direction = sessionChange > 0 ? 'increased' : 'decreased';
+      trends.push({
+        id: 'TREND_TRAFFIC_CHANGE', severity: 'medium', title: 'Traffic changed',
+        message: `Sessions ${direction} by ${Math.abs(round(sessionChange))}% compared with the previous period.`,
+        scope: {}, evidence: [{ metric: 'sessions', value: current.totals.sessions, baseline: comparison.totals.sessions, changePercent: round(sessionChange) }],
+        recommendationId: 'REVIEW_TRAFFIC_SOURCES',
+      });
+      recommendations.add('REVIEW_TRAFFIC_SOURCES');
+    }
+    const conversionChange = current.totals.conversionRate - comparison.totals.conversionRate;
+    if (Math.abs(conversionChange) >= 1 && Math.abs(percentageChange(current.totals.conversionRate, comparison.totals.conversionRate)) >= 20) {
+      trends.push({
+        id: 'TREND_CONVERSION_CHANGE', severity: conversionChange < 0 ? 'high' : 'medium', title: 'Conversion rate changed',
+        message: `Conversion rate ${conversionChange < 0 ? 'fell' : 'rose'} by ${round(Math.abs(conversionChange))} percentage points.`,
+        scope: {}, evidence: [{ metric: 'conversionRate', value: round(current.totals.conversionRate), baseline: round(comparison.totals.conversionRate), changePoints: round(conversionChange) }],
+        recommendationId: conversionChange < 0 ? 'REVIEW_CONVERSION_PATH' : 'REVIEW_HIGH_PERFORMERS',
+      });
+      recommendations.add(conversionChange < 0 ? 'REVIEW_CONVERSION_PATH' : 'REVIEW_HIGH_PERFORMERS');
+    }
+  }
+
+  if (current.totals.sessions > 0 && current.totals.sessions < 30) {
+    recommendations.add('WAIT_FOR_MORE_DATA');
+  }
+
+  for (const row of current.rows as Array<Record<string, unknown>>) {
+    const sessions = Number(row.sessions ?? 0);
+    const conversionRate = Number(row.conversionRate ?? 0);
+    const engagement = Number(row.averageEngagementTimeMs ?? 0);
+    const scroll = Number(row.averageScrollDepthPercent ?? 0);
+    if (sessions < 20) continue;
+    if (engagement >= Number(current.totals.averageEngagementTimeMs) * 1.2 && scroll >= Number(current.totals.averageScrollDepthPercent) + 10 && conversionRate <= Number(current.totals.conversionRate) - 1) {
+      const scope = rowScope(row);
+      opportunities.push({ id: 'OPP_HIGH_ENGAGEMENT_LOW_CONVERSION', severity: 'medium', title: 'Engaged traffic has weak conversion', message: 'This segment engages above the site average but converts below it.', scope, evidence: [{ metric: 'sessions', value: sessions, minimum: 20 }, { metric: 'conversionRate', value: round(conversionRate), baseline: round(Number(current.totals.conversionRate)), unit: 'percent' }, { metric: 'averageEngagementTimeMs', value: Math.round(engagement), baseline: Math.round(Number(current.totals.averageEngagementTimeMs)) }, { metric: 'averageScrollDepthPercent', value: round(scroll), baseline: round(Number(current.totals.averageScrollDepthPercent)) }], recommendationId: 'REVIEW_CTA_AND_FORM' });
+      recommendations.add('REVIEW_CTA_AND_FORM');
+    }
+    if (sessions >= 30 && Number(row.convertingSessions ?? 0) === 0) {
+      const scope = rowScope(row);
+      opportunities.push({ id: 'OPP_TRAFFIC_NO_CONVERSIONS', severity: 'medium', title: 'Traffic has no recorded conversions', message: 'This segment has meaningful traffic but no recorded converting sessions in the period.', scope, evidence: [{ metric: 'sessions', value: sessions, minimum: 30 }, { metric: 'convertingSessions', value: 0 }], recommendationId: 'REVIEW_CONVERSION_PATH' });
+      recommendations.add('REVIEW_CONVERSION_PATH');
+    }
+    if (sessions >= 30 && scroll < 35) {
+      problems.push({ id: 'PROBLEM_LOW_SCROLL', severity: 'medium', title: 'Visitors are not reaching deep content', message: 'Average maximum scroll depth is below 35% for this segment.', scope: rowScope(row), evidence: [{ metric: 'sessions', value: sessions, minimum: 30 }, { metric: 'averageScrollDepthPercent', value: round(scroll), threshold: 35 }], recommendationId: 'REVIEW_PAGE_STRUCTURE' });
+      recommendations.add('REVIEW_PAGE_STRUCTURE');
+    }
+  }
+
+  if (current.totals.sessions > 0 && current.totals.conversions === 0) {
+    recommendations.add('VERIFY_TRACKING_AND_CONVERSION_SETUP');
+  }
+
+  return { opportunities, problems, trends, anomalies, recommendations: [...recommendations].map((id) => ({ id })) };
+}
+
+function rowScope(row: Record<string, unknown>): Record<string, string> {
+  return Object.fromEntries(['sourceCategory', 'source', 'medium', 'campaign', 'landingPage', 'device'].flatMap((key) => row[key] ? [[key, String(row[key])]] : []));
+}
+
+function percentageChange(value: number, baseline: number): number {
+  return baseline === 0 ? (value === 0 ? 0 : 100) : ((value - baseline) / baseline) * 100;
 }

@@ -120,6 +120,8 @@ Conversion analytics are available through the authenticated `GET /api/websites/
 
 The authenticated `GET /api/websites/:id/intelligence` endpoint connects acquisition, landing page, device, behavior, and conversion data into bounded aggregate rows. It also returns recorded last-page counts. These are aggregate analytics only and do not expose visitor or session identifiers.
 
+The intelligence response also includes deterministic opportunities, problems, trends, anomalies, and recommendation IDs. These are evidence-based patterns with minimum sample thresholds, not causal or AI-generated conclusions.
+
 The `click` event stores only normalized, bucketable coordinates for heatmap aggregation. It excludes form controls and editable content, and the backend does not store screenshots, cursor paths, or session video. Behavior and heatmap aggregates are available through the authenticated `GET /api/websites/:id/behavior` endpoint.
 
 ## Real website tracking script

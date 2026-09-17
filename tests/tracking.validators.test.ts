@@ -193,4 +193,7 @@ test('exposes the cross-dimension intelligence analytics route', async () => {
   assert.match(serviceSource, /conversionEvents/);
   assert.match(serviceSource, /landingPage/);
   assert.match(routeSource, /analyticsController\.intelligence/);
+  assert.match(serviceSource, /OPP_HIGH_ENGAGEMENT_LOW_CONVERSION/);
+  assert.match(serviceSource, /TREND_TRAFFIC_CHANGE/);
+  assert.match(serviceSource, /recommendationId/);
 });
