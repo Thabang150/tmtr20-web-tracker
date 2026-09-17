@@ -118,6 +118,8 @@ Accepted events return `202` with `{ "accepted": true }`. Events are tied to the
 
 Conversion analytics are available through the authenticated `GET /api/websites/:id/conversions` endpoint. The response includes conversion event totals, unique converting sessions, conversion breakdowns by page/source/device, and a session-based conversion rate. Website owners can define bounded funnels with `GET/POST /api/websites/:id/funnels` and evaluate one with `?funnel=<key>`.
 
+The authenticated `GET /api/websites/:id/intelligence` endpoint connects acquisition, landing page, device, behavior, and conversion data into bounded aggregate rows. It also returns recorded last-page counts. These are aggregate analytics only and do not expose visitor or session identifiers.
+
 The `click` event stores only normalized, bucketable coordinates for heatmap aggregation. It excludes form controls and editable content, and the backend does not store screenshots, cursor paths, or session video. Behavior and heatmap aggregates are available through the authenticated `GET /api/websites/:id/behavior` endpoint.
 
 ## Real website tracking script

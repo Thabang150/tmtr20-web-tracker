@@ -38,6 +38,10 @@ export const behavior: RequestHandler = async (request, response, next) => {
   await handle(request, response, next, 'behavior', analyticsService.getBehavior);
 };
 
+export const intelligence: RequestHandler = async (request, response, next) => {
+  await handle(request, response, next, 'intelligence', analyticsService.getIntelligence);
+};
+
 export const topPages: RequestHandler = async (request, response, next) => {
   await handle(request, response, next, 'top-pages', analyticsService.getTopPages);
 };

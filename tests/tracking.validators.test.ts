@@ -182,3 +182,15 @@ test('blocks private IPv4 and IPv6 audit addresses', () => {
   assert.equal(isPrivateAddress('::1'), true);
   assert.equal(isPrivateAddress('8.8.8.8'), false);
 });
+
+test('exposes the cross-dimension intelligence analytics route', async () => {
+  const [serviceSource, routeSource] = await Promise.all([
+    readFile(path.resolve(process.cwd(), 'src', 'services', 'analytics.service.ts'), 'utf8'),
+    readFile(path.resolve(process.cwd(), 'src', 'routes', 'analytics.routes.ts'), 'utf8'),
+  ]);
+
+  assert.match(serviceSource, /export async function getIntelligence/);
+  assert.match(serviceSource, /conversionEvents/);
+  assert.match(serviceSource, /landingPage/);
+  assert.match(routeSource, /analyticsController\.intelligence/);
+});

@@ -367,3 +367,114 @@ export async function getBehavior(websiteId: Types.ObjectId, range: DateRange) {
     clicks,
   };
 }
+
+export async function getIntelligence(websiteId: Types.ObjectId, range: DateRange) {
+  const [result] = await SessionModel.aggregate([
+    { $match: { websiteId, startTime: { $gte: range.start, $lt: range.end } } },
+    {
+      $lookup: {
+        from: 'events',
+        let: { sessionId: '$sessionId', websiteId: '$websiteId' },
+        pipeline: [
+          { $match: { $expr: { $and: [
+            { $eq: ['$sessionId', '$$sessionId'] },
+            { $eq: ['$websiteId', '$$websiteId'] },
+            { $in: ['$eventName', CONVERSION_EVENTS] },
+          ] } } },
+          { $project: { eventName: 1 } },
+        ],
+        as: 'conversionEvents',
+      },
+    },
+    {
+      $set: {
+        conversionEvents: { $size: '$conversionEvents' },
+        convertingSession: { $cond: [{ $gt: [{ $size: '$conversionEvents' }, 0] }, 1, 0] },
+      },
+    },
+    {
+      $facet: {
+        rows: [
+          {
+            $group: {
+              _id: {
+                sourceCategory: { $ifNull: ['$sourceCategory', 'Other'] },
+                source: { $ifNull: ['$source', '(direct)'] },
+                medium: { $ifNull: ['$medium', '(none)'] },
+                campaign: { $ifNull: ['$campaign', '(none)'] },
+                landingPage: { $ifNull: ['$landingPage', '(unknown)'] },
+                device: { $ifNull: ['$device', '(unknown)'] },
+              },
+              sessions: { $sum: 1 },
+              visitors: { $addToSet: '$visitorId' },
+              conversions: { $sum: '$conversionEvents' },
+              convertingSessions: { $sum: '$convertingSession' },
+              engagementTimeMs: { $sum: '$engagementTimeMs' },
+              maxScrollDepthPercent: { $sum: '$maxScrollDepthPercent' },
+              pageViews: { $sum: '$pageViews' },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              sourceCategory: '$_id.sourceCategory',
+              source: '$_id.source',
+              medium: '$_id.medium',
+              campaign: '$_id.campaign',
+              landingPage: '$_id.landingPage',
+              device: '$_id.device',
+              sessions: 1,
+              visitors: { $size: '$visitors' },
+              conversions: 1,
+              convertingSessions: 1,
+              conversionRate: { $multiply: [{ $cond: [{ $gt: ['$sessions', 0] }, { $divide: ['$convertingSessions', '$sessions'] }, 0] }, 100] },
+              averageEngagementTimeMs: { $cond: [{ $gt: ['$sessions', 0] }, { $divide: ['$engagementTimeMs', '$sessions'] }, 0] },
+              averageScrollDepthPercent: { $cond: [{ $gt: ['$sessions', 0] }, { $divide: ['$maxScrollDepthPercent', '$sessions'] }, 0] },
+              averagePagesPerSession: { $cond: [{ $gt: ['$sessions', 0] }, { $divide: ['$pageViews', '$sessions'] }, 0] },
+            },
+          },
+          { $sort: { sessions: -1 } },
+          { $limit: 200 },
+        ],
+        totals: [
+          {
+            $group: {
+              _id: null,
+              sessions: { $sum: 1 },
+              visitors: { $addToSet: '$visitorId' },
+              conversions: { $sum: '$conversionEvents' },
+              convertingSessions: { $sum: '$convertingSession' },
+              engagementTimeMs: { $sum: '$engagementTimeMs' },
+              maxScrollDepthPercent: { $sum: '$maxScrollDepthPercent' },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              sessions: 1,
+              visitors: { $size: '$visitors' },
+              conversions: 1,
+              convertingSessions: 1,
+              conversionRate: { $multiply: [{ $cond: [{ $gt: ['$sessions', 0] }, { $divide: ['$convertingSessions', '$sessions'] }, 0] }, 100] },
+              averageEngagementTimeMs: { $cond: [{ $gt: ['$sessions', 0] }, { $divide: ['$engagementTimeMs', '$sessions'] }, 0] },
+              averageScrollDepthPercent: { $cond: [{ $gt: ['$sessions', 0] }, { $divide: ['$maxScrollDepthPercent', '$sessions'] }, 0] },
+            },
+          },
+        ],
+        exitPages: [
+          { $group: { _id: { $ifNull: ['$exitPage', '(unknown)'] }, sessions: { $sum: 1 } } },
+          { $project: { _id: 0, pagePath: '$_id', sessions: 1 } },
+          { $sort: { sessions: -1 } },
+          { $limit: 100 },
+        ],
+      },
+    },
+  ]);
+
+  return {
+    period: periodResponse(range),
+    totals: result?.totals[0] ?? { sessions: 0, visitors: 0, conversions: 0, convertingSessions: 0, conversionRate: 0, averageEngagementTimeMs: 0, averageScrollDepthPercent: 0 },
+    rows: result?.rows ?? [],
+    exitPages: result?.exitPages ?? [],
+  };
+}

@@ -10,4 +10,5 @@ analyticsRouter.get('/:id/conversions', analyticsController.conversions);
 analyticsRouter.get('/:id/sources', analyticsController.sources);
 analyticsRouter.get('/:id/audience', analyticsController.audience);
 analyticsRouter.get('/:id/behavior', analyticsController.behavior);
+analyticsRouter.get('/:id/intelligence', analyticsController.intelligence);
 analyticsRouter.get('/:id/top-pages', analyticsController.topPages);
